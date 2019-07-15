@@ -1,0 +1,6 @@
+spring:
+  redis:
+    host: 10.192.33.102
+    password: rxdcc
+    port: 6379
+    database: 6
