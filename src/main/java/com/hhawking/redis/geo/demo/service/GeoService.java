@@ -14,15 +14,15 @@ public class GeoService {
     @Autowired
     private RedisTemplate redisTemplate;
 
-    private final String cityGeoKey = "test";
+    private final String cityGeoKey = "geo";
 
     public void testAdd(double x,double y,String member){
         Long addedNum = redisTemplate.opsForGeo().add(cityGeoKey,new Point(x,y),member);
         System.out.println(addedNum);
     }
     
-    public void testGeoGet(){
-        List<Point> points = redisTemplate.opsForGeo().position(cityGeoKey,"北京","上海","深圳");
+    public void testGeoGet(String members){
+        List<Point> points = redisTemplate.opsForGeo().position(cityGeoKey,members);
         System.out.println(points);
     }
     
@@ -32,9 +32,9 @@ public class GeoService {
         System.out.println(distance);
     }
     
-    public void testNearByXY(){
+    public void testNearByXY(double x,double y){
         //longitude,latitude
-        Circle circle = new Circle(116.405285,39.904989, Metrics.KILOMETERS.getMultiplier());
+        Circle circle = new Circle(x,y, Metrics.KILOMETERS.getMultiplier());
         RedisGeoCommands.GeoRadiusCommandArgs args = RedisGeoCommands.GeoRadiusCommandArgs.newGeoRadiusArgs().includeDistance().includeCoordinates().sortAscending().limit(5);
         GeoResults<RedisGeoCommands.GeoLocation<String>>  results = redisTemplate.opsForGeo()
                 .radius(cityGeoKey,circle,args);
