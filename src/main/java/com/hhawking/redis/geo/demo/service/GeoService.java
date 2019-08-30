@@ -1,57 +1,60 @@
 package com.hhawking.redis.geo.demo.service;
 
+import com.google.common.base.Splitter;
+import com.hhawking.redis.geo.demo.entity.AddressResult;
+import com.hhawking.redis.geo.demo.utils.JedisGeo;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.geo.*;
-import org.springframework.data.redis.connection.RedisGeoCommands;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 
+/**
+* @title: 经纬度-地址转换服务
+* @Author: HH
+* @Date: 2019-8-1 15:48
+*/
 @Service
 public class GeoService {
 
     @Autowired
-    private RedisTemplate redisTemplate;
+    private JedisGeo jedisGeo;
 
-    private final String cityGeoKey = "geo";
+    private static final String URL = "https://restapi.amap.com/v3/geocode/regeo?key=${amap.key}&radius=200&location=";
 
-    public void testAdd(double x,double y,String member){
-        Long addedNum = redisTemplate.opsForGeo().add(cityGeoKey,new Point(x,y),member);
-        System.out.println(addedNum);
+    public  String  getAddress(String location) {
+        if (StringUtils.isBlank(location)){
+            return "-";
+        }
+        List<String> split = Splitter.on(",").trimResults().omitEmptyStrings().splitToList(location);
+        if (split.size()!=2){
+            return "-";
+        }
+        String s0 = split.get(0);
+        String s1 = split.get(1);
+        if ("0".equals(s0) && "0".equals(s1)){
+            return "-";
+        }
+        String address = jedisGeo.geoRadius(s0,s1, 20);
+        if (StringUtils.isNotBlank(address)){
+            return address;
+        }else {
+            try {
+                RestTemplate restTemplate = new RestTemplate();
+                AddressResult addressResult = restTemplate.getForObject(URL + location, AddressResult.class);
+                if (addressResult != null && "1".equals(addressResult.getStatus())) {
+                    String formattedAddress = addressResult.getRegeocode().getFormatted_address();
+                    jedisGeo.geoAdd(s0, s1, formattedAddress);
+                    return formattedAddress;
+                } else {
+                    return "-";
+                }
+            }catch (Exception e){
+                return "-";
+            }
+        }
     }
-    
-    public void testGeoGet(String members){
-        List<Point> points = redisTemplate.opsForGeo().position(cityGeoKey,members);
-        System.out.println(points);
-    }
-    
-    public void testDist(){
-        Distance distance = redisTemplate.opsForGeo()
-                .distance(cityGeoKey,"北京","上海", RedisGeoCommands.DistanceUnit.KILOMETERS);
-        System.out.println(distance);
-    }
-    
-    public void testNearByXY(double x,double y){
-        //longitude,latitude
-        Circle circle = new Circle(x,y, Metrics.KILOMETERS.getMultiplier());
-        RedisGeoCommands.GeoRadiusCommandArgs args = RedisGeoCommands.GeoRadiusCommandArgs.newGeoRadiusArgs().includeDistance().includeCoordinates().sortAscending().limit(5);
-        GeoResults<RedisGeoCommands.GeoLocation<String>>  results = redisTemplate.opsForGeo()
-                .radius(cityGeoKey,circle,args);
-        System.out.println(results);
-    }
-    
-    public void testNearByPlace(){
-        Distance distance = new Distance(5,Metrics.KILOMETERS);
-        RedisGeoCommands.GeoRadiusCommandArgs args = RedisGeoCommands.GeoRadiusCommandArgs.newGeoRadiusArgs().includeDistance().includeCoordinates().sortAscending().limit(5);
-        GeoResults<RedisGeoCommands.GeoLocation<String>>  results = redisTemplate.opsForGeo()
-                .radius(cityGeoKey,"北京",distance,args);
-        System.out.println(results);
-    }
-    
-    public void testGeoHash(){
-        List<String> results = redisTemplate.opsForGeo()
-                .hash(cityGeoKey,"北京","上海","深圳");
-        System.out.println(results);
-    }
+
+
 }
